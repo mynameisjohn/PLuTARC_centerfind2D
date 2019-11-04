@@ -111,9 +111,6 @@ void find_centers_2D(Image2D &image_in, const Params &Parameters, Filestreams &f
 		//cout << framenumber << counter << endl;
 	}
 
-	//in all cases, print out particle position data in binary hdf5 format
-	PrintParticleData_hdf5(files.outdata_hdf5_file, particledata, counter, framenumber, stacknumber);
-
 	delete [] particledata;
 	particledata = NULL;
 

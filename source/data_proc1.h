@@ -47,8 +47,6 @@
 #include "kernel1.h"
 #include "image1.h"
 #include "FreeImage.h"
-#include "hdf5.h"
-#include "hdf5_hl.h"
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -70,9 +68,6 @@ IppStatus PrintOutputImages(const Image2D &image_in, const Image2D &image_bpass,
 void PrintParticleDataHeader(ostream &out);
 
 void PrintParticleData(ostream &out, const Ipp32f particledata[][8], const int startrow, const int endrow,
-					   const int framenumber, const int stacknumber);
-
-void PrintParticleData_hdf5(hid_t outdata_hdf5_file, const Ipp32f particledata[][8], const int numrows,
 					   const int framenumber, const int stacknumber);
 
 Ipp32f (*ParticleStatistics(Image2D &image_localmax, Image2D &image_in, const int mask_radius,

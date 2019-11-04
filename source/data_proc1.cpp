@@ -58,14 +58,14 @@ IppStatus BandPass_2D(Image2D &image_in, Image2D &image_bandpassed, const int fe
 	Image2D image_tophat(image_in.get_length(), image_in.get_width());
 
 	//Gaussian kernel convolution
-	status = ippiFilterColumn_32f_C1R(image_in.get_image2D() + GaussKernel.get_offset(), step_size,
-		image_gauss_col.get_image2D() + GaussKernel.get_offset(), step_size,
-		GaussKernel.get_ROI_size(), GaussKernel.get_gaussian_kernel(),
-		GaussKernel.get_kernel_length(), GaussKernel.get_anchor_point());
-	status = ippiFilterRow_32f_C1R(image_gauss_col.get_image2D() + GaussKernel.get_offset(), step_size,
-		image_gauss_rowcol.get_image2D() + GaussKernel.get_offset(), step_size,
-		GaussKernel.get_ROI_size(), GaussKernel.get_gaussian_kernel(),
-		GaussKernel.get_kernel_length(), GaussKernel.get_anchor_point());
+	//status = ippiFilterColumnPipeline_32f_C1R(image_in.get_image2D() + GaussKernel.get_offset(), step_size,
+	//	image_gauss_col.get_image2D() + GaussKernel.get_offset(), step_size,
+	//	GaussKernel.get_ROI_size(), GaussKernel.get_gaussian_kernel(),
+	//	GaussKernel.get_kernel_length(), GaussKernel.get_anchor_point());
+	//status = ippiFilterRow_32f_C1R(image_gauss_col.get_image2D() + GaussKernel.get_offset(), step_size,
+	//	image_gauss_rowcol.get_image2D() + GaussKernel.get_offset(), step_size,
+	//	GaussKernel.get_ROI_size(), GaussKernel.get_gaussian_kernel(),
+	//	GaussKernel.get_kernel_length(), GaussKernel.get_anchor_point());
 
 /*
 	//tophat kernel convolution/filterbox operation
@@ -76,9 +76,9 @@ IppStatus BandPass_2D(Image2D &image_in, Image2D &image_bandpassed, const int fe
 */
 
 	//change by Eli Sloutskin: take away bias of square filtering kernel
-    status = ippiConvValid_32f_C1R(image_in.get_image2D(), step_size, image_in.get_ROIfull(),
-            ConvolutionKernels.get_circle_kernel(), ConvolutionKernels.get_kernel_step(), ConvolutionKernels.get_kernel_size(),
-            image_tophat.get_image2D() + ConvolutionKernels.get_offset(), step_size);
+    //status = ippiConvValid_32f_C1R(image_in.get_image2D(), step_size, image_in.get_ROIfull(),
+    //        ConvolutionKernels.get_circle_kernel(), ConvolutionKernels.get_kernel_step(), ConvolutionKernels.get_kernel_size(),
+    //        image_tophat.get_image2D() + ConvolutionKernels.get_offset(), step_size);
 
     ippiDivC_32f_C1IR(3*feature_radius*feature_radius, image_tophat.get_image2D(),image_tophat.get_stepsize(),image_tophat.get_ROIfull());
 
@@ -121,12 +121,13 @@ IppStatus FindLocalMax_2D(Image2D &image_bpass, Image2D &image_bpass_thresh, Ima
 	//Dilate Bandpassed image with a circular kernel
 	status = ippiSet_32f_C1R(intensity_threshold, image_dilated.get_image2D(), image_dilated.get_stepsize(),
 		image_dilated.get_ROIfull());
-	status = ippiDilate_32f_C1R(
-		//image_bpass.get_image2D() + DilationKernel.get_offset(), image_bpass.get_stepsize(),
-		image_bpass_thresh.get_image2D() + DilationKernel.get_offset(), image_bpass_thresh.get_stepsize(),
-		image_dilated.get_image2D()+ DilationKernel.get_offset(), image_dilated.get_stepsize(),
-		DilationKernel.get_ROI_size(), DilationKernel.get_dilation_kernel(), DilationKernel.get_mask_size(),
-		DilationKernel.get_anchor_point());
+
+	//status = ippiDilate_32f_C1R_L (
+	//	//image_bpass.get_image2D() + DilationKernel.get_offset(), image_bpass.get_stepsize(),
+	//	image_bpass_thresh.get_image2D() + DilationKernel.get_offset(), image_bpass_thresh.get_stepsize(),
+	//	image_dilated.get_image2D()+ DilationKernel.get_offset(), image_dilated.get_stepsize(),
+	//	DilationKernel.get_ROI_size(), DilationKernel.get_dilation_kernel(), DilationKernel.get_mask_size(),
+	//	DilationKernel.get_anchor_point());
 
 	//subtract, such that resulting array is negative to zero (for later exponentation)
 	status = ippiSub_32f_C1R(
@@ -204,51 +205,6 @@ void PrintParticleData(ostream &out, const Ipp32f particledata[][8], const int s
 		out << endl;
 	}
 	out.precision(5);
-}
-
-void PrintParticleData_hdf5(hid_t outdata_hdf5_file, const Ipp32f particledata[][8], const int numrows,
-					   const int framenumber, const int stacknumber)
-{
-	//copy data from particle data array to reduced array for hdf5 file output
-	float (*outparticledata)[4] = new float[numrows][4];
-	for(int j = 0; j < numrows; j++) {
-		outparticledata[j][0] = particledata[j][1];		//x-position
-		outparticledata[j][1] = particledata[j][2];		//y-position
-		outparticledata[j][2] = particledata[j][5];		//total mass
-		outparticledata[j][3] = sqrt(particledata[j][6]);				//radius of gyration
-	}
-	//create new hdf5 dataspace to hold output array
-	//each dataset holds one frame's worth of x-y positions
-	hsize_t dimsf[2] = {numrows, 4};
-	hid_t hdf5_dataspace, hdf5_dataset_xypos, hdf5_group;
-	hdf5_dataspace = H5Screate_simple(2, dimsf, NULL);
-	hid_t compress_chunk_params;
-	hsize_t chunk_dims[2] = {numrows,4};
-	compress_chunk_params = H5Pcreate(H5P_DATASET_CREATE);
-	herr_t hdf5_status = H5Pset_chunk(compress_chunk_params, 2, chunk_dims);
-	//hdf5_status = H5Pset_deflate(compress_chunk_params, 9);
-
-	//group datasets by stack: create group
-
-	ostringstream hdf5_group_name_stream;
-	hdf5_group_name_stream << "stack" << stacknumber;
-	string hdf5_group_name = hdf5_group_name_stream.str();
-
-	ostringstream hdf5_dataset_name_stream;
-	hdf5_dataset_name_stream << "frame" << framenumber;
-	string hdf5_dataset_name = hdf5_dataset_name_stream.str();
-
-	hdf5_group = H5Gopen(outdata_hdf5_file, hdf5_group_name.c_str());
-	hdf5_dataset_xypos = H5Dcreate2(hdf5_group, hdf5_dataset_name.c_str(), H5T_NATIVE_FLOAT,
-			hdf5_dataspace, H5P_DEFAULT, compress_chunk_params, H5P_DEFAULT);
-
-	hdf5_status = H5Dwrite(hdf5_dataset_xypos, H5T_NATIVE_FLOAT, hdf5_dataspace,
-			hdf5_dataspace, H5P_DEFAULT, outparticledata);
-
-	hdf5_status = H5Dclose(hdf5_dataset_xypos);
-	hdf5_status = H5Gclose(hdf5_group);
-	delete [] outparticledata;
-
 }
 
 
